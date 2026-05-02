@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Classroom Air Quality — Power BI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-dark: #1a1a2e;
+    --bg-panel: #16213e;
+    --bg-card: #0f3460;
+    --bg-sidebar: #0d1b2a;
+    --accent-blue: #4fc3f7;
+    --accent-teal: #00e5ff;
+    --accent-green: #00e676;
+    --accent-amber: #ffb300;
+    --accent-red: #ff5252;
+    --accent-purple: #ce93d8;
+    --text-primary: #e8eaf6;
+    --text-secondary: #90a4ae;
+    --text-muted: #546e7a;
+    --border: rgba(79,195,247,0.15);
+    --card-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    --good: #00e676;
+    --moderate: #ffb300;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', 'Segoe UI', sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 48px;
+    flex-shrink: 0;
+  }
+  .topbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--accent-blue);
+    letter-spacing: -0.3px;
+  }
+  .topbar-logo svg { width: 22px; height: 22px; }
+  .topbar-title {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-left: 4px;
+  }
+  .topbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .badge-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.05);
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR (Filters) ── */
+  .sidebar {
+    width: 220px;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+  .sidebar-section {
+    padding: 0 16px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+  .sidebar-section:last-child { border-bottom: none; }
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    margin-top: 4px;
+  }
+  .filter-search {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    font-size: 12px;
+    margin-bottom: 10px;
+    outline: none;
+  }
+  .filter-search:focus { border-color: var(--accent-blue); }
+  .filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    cursor: pointer;
+    user-select: none;
+  }
+  .filter-item input[type=checkbox] { display: none; }
+  .filter-check {
+    width: 14px; height: 14px;
+    border: 2px solid var(--text-muted);
+    border-radius: 3px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .filter-item.active .filter-check {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+  }
+  .filter-item.active .filter-check::after {
+    content: '✓';
+    font-size: 9px;
+    color: white;
+    font-weight: 700;
+  }
+  .filter-item span {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .filter-item.active span { color: var(--text-primary); }
+  .filter-bar-wrap { margin-top: 4px; }
+  .filter-bar {
+    height: 3px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 2px;
+    margin-top: 3px;
+    overflow: hidden;
+  }
+  .filter-bar-fill { height: 100%; background: var(--accent-blue); border-radius: 2px; }
+
+  .select-all-btn {
+    font-size: 10px;
+    color: var(--accent-blue);
+    cursor: pointer;
+    text-decoration: underline;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* ── MAIN CONTENT ── */
+  .main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 22px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ── PAGE TITLE ── */
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    margin-bottom: 2px;
+  }
+  .page-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+  .page-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  .active-filters-bar {
+    font-size: 11px;
+    color: var(--accent-blue);
+    background: rgba(79,195,247,0.08);
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(79,195,247,0.2);
+    margin-left: auto;
+  }
+
+  /* ── KPI ROW ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  .kpi-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.5); }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 10px 10px 0 0;
+  }
+  .kpi-card.blue::before { background: var(--accent-blue); }
+  .kpi-card.teal::before { background: var(--accent-teal); }
+  .kpi-card.green::before { background: var(--accent-green); }
+  .kpi-card.amber::before { background: var(--accent-amber); }
+  .kpi-card.purple::before { background: var(--accent-purple); }
+  .kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .kpi-card.blue .kpi-value { color: var(--accent-blue); }
+  .kpi-card.teal .kpi-value { color: var(--accent-teal); }
+  .kpi-card.green .kpi-value { color: var(--accent-green); }
+  .kpi-card.amber .kpi-value { color: var(--accent-amber); }
+  .kpi-card.purple .kpi-value { color: var(--accent-purple); }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .kpi-trend {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 10px;
+    width: fit-content;
+  }
+  .kpi-trend.up { background: rgba(255,82,82,0.15); color: var(--accent-red); }
+  .kpi-trend.ok { background: rgba(0,230,118,0.12); color: var(--accent-green); }
+
+  /* ── CHARTS GRID ── */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .charts-row-3 {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 16px;
+  }
+  .chart-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chart-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-secondary);
+  }
+  .chart-badge {
+    font-size: 10px;
+    color: var(--accent-teal);
+    background: rgba(0,229,255,0.08);
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,229,255,0.2);
+  }
+  .chart-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+  canvas { width: 100% !important; }
+
+  /* ── PERIOD TABLE ── */
+  .table-wrap {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  thead th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  thead th:hover { color: var(--accent-blue); }
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+  }
+  tbody tr:hover { background: rgba(79,195,247,0.05); }
+  tbody td {
+    padding: 7px 10px;
+    color: var(--text-secondary);
+  }
+  tbody td:first-child { color: var(--text-primary); font-weight: 500; }
+  .pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .pill-good { background: rgba(0,230,118,0.12); color: var(--good); }
+  .pill-mod { background: rgba(255,179,0,0.12); color: var(--moderate); }
+  .pill-idle { background: rgba(79,195,247,0.1); color: var(--accent-blue); }
+  .pill-mon { background: rgba(206,147,216,0.12); color: var(--accent-purple); }
+
+  .mini-bar {
+    display: inline-block;
+    height: 6px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-muted);
+    padding: 10px 0 6px;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(79,195,247,0.2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 3h18v18H3z" rx="2"/>
+      <path d="M3 9h18M9 21V9"/>
+    </svg>
+    Power BI
+  </div>
+  <div class="topbar-title">/ Unique Tech School — Classroom Air Quality</div>
+  <div class="topbar-right">
+    <span class="badge-date" id="dateLabel">Nov 12, 2025 · 500 records</span>
+  </div>
+</div>
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-label">School Period</div>
+    <span class="select-all-btn" id="selectAllBtn" onclick="toggleAll()">Deselect All</span>
+    <div id="periodFilters"></div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Air Quality</div>
+    <div class="filter-item active" id="aqGood" onclick="toggleAQ('Good')">
+      <div class="filter-check"></div>
+      <span>● Good</span>
+    </div>
+    <div class="filter-item active" id="aqModerate" onclick="toggleAQ('Moderate')">
+      <div class="filter-check"></div>
+      <span>● Moderate</span>
+    </div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Quick Stats</div>
+    <div style="font-size:11px; color:var(--text-muted); line-height:1.9;">
+      Records: <span style="color:var(--text-secondary)" id="statTotal">500</span><br>
+      Good: <span style="color:var(--good)" id="statGood">335</span><br>
+      Moderate: <span style="color:var(--moderate)" id="statMod">165</span><br>
+      Max CO₂: <span style="color:var(--accent-red)" id="statMax">893 ppm</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">Classroom Air Quality Monitor</div>
+      <div class="page-subtitle">Sensor data · Robot-assisted ventilation tracking · Nov 12, 2025</div>
+    </div>
+    <div class="active-filters-bar" id="filterBadge">All periods selected</div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpi-row">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Avg CO₂</div>
+      <div class="kpi-value" id="kpiCO2">619</div>
+      <div class="kpi-sub">ppm · threshold 700</div>
+      <div class="kpi-trend up" id="kpiCO2Trend">↑ elevated</div>
+    </div>
+    <div class="kpi-card teal">
+      <div class="kpi-label">Avg PM2.5</div>
+      <div class="kpi-value" id="kpiPM25">8.4</div>
+      <div class="kpi-sub">µg/m³ · WHO limit 15</div>
+      <div class="kpi-trend ok">✓ safe</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Avg Temp</div>
+      <div class="kpi-value" id="kpiTemp">20.5</div>
+      <div class="kpi-sub">°C</div>
+      <div class="kpi-trend ok">✓ comfortable</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">Avg Humidity</div>
+      <div class="kpi-value" id="kpiHum">44.5</div>
+      <div class="kpi-sub">% RH</div>
+      <div class="kpi-trend ok">✓ optimal</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Good Quality</div>
+      <div class="kpi-value" id="kpiGoodPct">67%</div>
+      <div class="kpi-sub" id="kpiGoodCount">335 of 500 readings</div>
+      <div class="kpi-trend ok" id="kpiQualTrend">✓ majority good</div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Line charts -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">CO₂ Over Time (ppm)</div>
+        <div class="chart-badge" id="co2Badge">Avg 619 ppm</div>
+      </div>
+      <div class="chart-wrap" style="height:190px">
+        <canvas id="co2Chart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">PM2.5 Over Time (µg/m³)</div>
+        <div class="chart-badge" id="pm25Badge">Avg 8.4 µg/m³</div>
+      </div>
+      <div class="chart-wrap" style="height:190px">
+        <canvas id="pm25Chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Bar + Donut + Scatter -->
+  <div class="charts-row-3">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Avg CO₂ & PM2.5 by School Period</div>
+        <div class="chart-badge">Period comparison</div>
+      </div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="periodChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Air Quality Split</div>
+        <div class="chart-badge" id="donutBadge">500 readings</div>
+      </div>
+      <div class="chart-wrap" style="height:200px; display:flex; align-items:center; justify-content:center;">
+        <canvas id="donutChart" style="max-width:200px; max-height:200px"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Students vs CO₂</div>
+        <div class="chart-badge">Correlation</div>
+      </div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="scatterChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Table -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div class="chart-title">Period Summary Table</div>
+      <div class="chart-badge">All 9 periods</div>
+    </div>
+    <div class="table-wrap">
+      <table id="periodTable">
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>Avg CO₂ (ppm)</th>
+            <th>Avg PM2.5 (µg/m³)</th>
+            <th>Avg Students</th>
+            <th>Avg Humidity (%)</th>
+            <th>Readings</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<div class="footer">Classroom Air Quality Dashboard · Power BI–style · Built from sensor data Nov 12, 2025</div>
+
+<script>
+// ── DATA ──
+const RAW = [{"timestamp":"08:00","co2_ppm":442.1,"pm25_ugm3":5.16,"temperature_c":21.0,"humidity_pct":45.0,"student_count_estimated":11,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:03","co2_ppm":466.9,"pm25_ugm3":5.93,"temperature_c":21.0,"humidity_pct":44.7,"student_count_estimated":11,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:06","co2_ppm":520.6,"pm25_ugm3":6.25,"temperature_c":21.0,"humidity_pct":44.7,"student_count_estimated":16,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:10","co2_ppm":553.0,"pm25_ugm3":7.09,"temperature_c":21.0,"humidity_pct":44.9,"student_count_estimated":19,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:13","co2_ppm":589.0,"pm25_ugm3":6.74,"temperature_c":21.0,"humidity_pct":44.9,"student_count_estimated":11,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:17","co2_ppm":600.3,"pm25_ugm3":7.01,"temperature_c":20.9,"humidity_pct":44.8,"student_count_estimated":11,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:20","co2_ppm":629.7,"pm25_ugm3":8.17,"temperature_c":20.9,"humidity_pct":45.0,"student_count_estimated":16,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:23","co2_ppm":598.3,"pm25_ugm3":8.51,"temperature_c":20.9,"humidity_pct":44.7,"student_count_estimated":10,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:27","co2_ppm":569.6,"pm25_ugm3":8.86,"temperature_c":20.8,"humidity_pct":44.4,"student_count_estimated":6,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:30","co2_ppm":566.4,"pm25_ugm3":8.64,"temperature_c":20.8,"humidity_pct":44.4,"student_count_estimated":5,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:34","co2_ppm":624.0,"pm25_ugm3":8.84,"temperature_c":20.8,"humidity_pct":44.6,"student_count_estimated":19,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:37","co2_ppm":654.0,"pm25_ugm3":9.29,"temperature_c":20.8,"humidity_pct":44.8,"student_count_estimated":16,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:40","co2_ppm":632.5,"pm25_ugm3":9.02,"temperature_c":20.8,"humidity_pct":44.7,"student_count_estimated":12,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:44","co2_ppm":636.3,"pm25_ugm3":9.01,"temperature_c":20.8,"humidity_pct":44.5,"student_count_estimated":9,"school_period":"Morning Entry","air_quality_label":"Good"},{"timestamp":"08:47","co2_ppm":711.9,"pm25_ugm3":9.56,"temperature_c":20.8,"humidity_pct":45.1,"student_count_estimated":27,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"08:51","co2_ppm":741.4,"pm25_ugm3":9.53,"temperature_c":20.8,"humidity_pct":45.5,"student_count_estimated":25,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"08:54","co2_ppm":770.1,"pm25_ugm3":10.04,"temperature_c":20.8,"humidity_pct":45.9,"student_count_estimated":22,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"08:57","co2_ppm":814.4,"pm25_ugm3":10.17,"temperature_c":20.8,"humidity_pct":46.3,"student_count_estimated":22,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:01","co2_ppm":852.9,"pm25_ugm3":11.15,"temperature_c":20.8,"humidity_pct":46.7,"student_count_estimated":26,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:04","co2_ppm":840.5,"pm25_ugm3":11.17,"temperature_c":20.8,"humidity_pct":46.9,"student_count_estimated":23,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:08","co2_ppm":857.3,"pm25_ugm3":11.29,"temperature_c":20.8,"humidity_pct":47.1,"student_count_estimated":26,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:11","co2_ppm":859.8,"pm25_ugm3":11.09,"temperature_c":20.8,"humidity_pct":47.3,"student_count_estimated":24,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:14","co2_ppm":851.4,"pm25_ugm3":11.55,"temperature_c":20.8,"humidity_pct":47.7,"student_count_estimated":25,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:18","co2_ppm":855.6,"pm25_ugm3":11.48,"temperature_c":20.8,"humidity_pct":48.0,"student_count_estimated":24,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:21","co2_ppm":857.4,"pm25_ugm3":11.14,"temperature_c":20.8,"humidity_pct":48.2,"student_count_estimated":24,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:25","co2_ppm":881.3,"pm25_ugm3":12.02,"temperature_c":20.8,"humidity_pct":48.4,"student_count_estimated":27,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:28","co2_ppm":845.4,"pm25_ugm3":11.94,"temperature_c":20.8,"humidity_pct":48.4,"student_count_estimated":22,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:31","co2_ppm":837.7,"pm25_ugm3":11.81,"temperature_c":20.8,"humidity_pct":48.4,"student_count_estimated":27,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:35","co2_ppm":862.7,"pm25_ugm3":11.94,"temperature_c":20.8,"humidity_pct":48.4,"student_count_estimated":23,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:38","co2_ppm":862.9,"pm25_ugm3":12.27,"temperature_c":20.8,"humidity_pct":48.4,"student_count_estimated":23,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:42","co2_ppm":875.2,"pm25_ugm3":12.86,"temperature_c":20.8,"humidity_pct":48.6,"student_count_estimated":26,"school_period":"1st Period","air_quality_label":"Moderate"},{"timestamp":"09:45","co2_ppm":868.6,"pm25_ugm3":12.47,"temperature_c":20.8,"humidity_pct":48.8,"student_count_estimated":27,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"09:48","co2_ppm":855.6,"pm25_ugm3":12.1,"temperature_c":20.8,"humidity_pct":48.9,"student_count_estimated":23,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"09:52","co2_ppm":829.1,"pm25_ugm3":12.7,"temperature_c":20.8,"humidity_pct":48.8,"student_count_estimated":24,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"09:55","co2_ppm":841.0,"pm25_ugm3":12.43,"temperature_c":20.8,"humidity_pct":48.9,"student_count_estimated":25,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"09:59","co2_ppm":870.8,"pm25_ugm3":12.16,"temperature_c":20.8,"humidity_pct":48.9,"student_count_estimated":25,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:02","co2_ppm":875.3,"pm25_ugm3":11.54,"temperature_c":20.8,"humidity_pct":48.9,"student_count_estimated":23,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:05","co2_ppm":891.9,"pm25_ugm3":12.33,"temperature_c":20.8,"humidity_pct":48.9,"student_count_estimated":24,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:09","co2_ppm":889.2,"pm25_ugm3":12.31,"temperature_c":20.8,"humidity_pct":49.0,"student_count_estimated":27,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:12","co2_ppm":875.6,"pm25_ugm3":12.43,"temperature_c":20.8,"humidity_pct":49.1,"student_count_estimated":24,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:16","co2_ppm":875.1,"pm25_ugm3":12.83,"temperature_c":20.8,"humidity_pct":49.2,"student_count_estimated":25,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:19","co2_ppm":836.9,"pm25_ugm3":12.65,"temperature_c":20.8,"humidity_pct":49.3,"student_count_estimated":22,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:22","co2_ppm":857.0,"pm25_ugm3":12.97,"temperature_c":20.8,"humidity_pct":49.4,"student_count_estimated":24,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:26","co2_ppm":854.9,"pm25_ugm3":14.22,"temperature_c":20.8,"humidity_pct":49.5,"student_count_estimated":25,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:29","co2_ppm":883.5,"pm25_ugm3":14.16,"temperature_c":20.8,"humidity_pct":49.6,"student_count_estimated":27,"school_period":"2nd Period","air_quality_label":"Moderate"},{"timestamp":"10:33","co2_ppm":780.9,"pm25_ugm3":12.58,"temperature_c":20.8,"humidity_pct":48.7,"student_count_estimated":4,"school_period":"Break","air_quality_label":"Moderate"},{"timestamp":"10:36","co2_ppm":669.8,"pm25_ugm3":11.15,"temperature_c":20.7,"humidity_pct":48.0,"student_count_estimated":1,"school_period":"Break","air_quality_label":"Good"},{"timestamp":"10:39","co2_ppm":602.2,"pm25_ugm3":10.16,"temperature_c":20.7,"humidity_pct":47.4,"student_count_estimated":4,"school_period":"Break","air_quality_label":"Good"},{"timestamp":"10:43","co2_ppm":537.5,"pm25_ugm3":9.32,"temperature_c":20.6,"humidity_pct":46.6,"student_count_estimated":0,"school_period":"Break","air_quality_label":"Good"},{"timestamp":"10:46","co2_ppm":587.6,"pm25_ugm3":8.75,"temperature_c":20.5,"humidity_pct":46.5,"student_count_estimated":25,"school_period":"3rd Period","air_quality_label":"Good"},{"timestamp":"10:50","co2_ppm":646.6,"pm25_ugm3":10.19,"temperature_c":20.5,"humidity_pct":46.8,"student_count_estimated":23,"school_period":"3rd Period","air_quality_label":"Good"},{"timestamp":"10:53","co2_ppm":696.3,"pm25_ugm3":11.39,"temperature_c":20.5,"humidity_pct":47.0,"student_count_estimated":24,"school_period":"3rd Period","air_quality_label":"Good"},{"timestamp":"10:56","co2_ppm":739.1,"pm25_ugm3":11.68,"temperature_c":20.5,"humidity_pct":47.4,"student_count_estimated":27,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:00","co2_ppm":760.7,"pm25_ugm3":12.0,"temperature_c":20.5,"humidity_pct":47.8,"student_count_estimated":27,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:03","co2_ppm":799.5,"pm25_ugm3":12.1,"temperature_c":20.5,"humidity_pct":48.2,"student_count_estimated":27,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:07","co2_ppm":803.5,"pm25_ugm3":12.06,"temperature_c":20.5,"humidity_pct":48.4,"student_count_estimated":27,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:10","co2_ppm":804.7,"pm25_ugm3":12.88,"temperature_c":20.5,"humidity_pct":48.5,"student_count_estimated":26,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:13","co2_ppm":816.7,"pm25_ugm3":12.39,"temperature_c":20.5,"humidity_pct":48.7,"student_count_estimated":25,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:17","co2_ppm":828.6,"pm25_ugm3":12.33,"temperature_c":20.5,"humidity_pct":48.8,"student_count_estimated":24,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:20","co2_ppm":804.3,"pm25_ugm3":12.23,"temperature_c":20.5,"humidity_pct":48.8,"student_count_estimated":23,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:24","co2_ppm":826.7,"pm25_ugm3":13.06,"temperature_c":20.5,"humidity_pct":49.0,"student_count_estimated":26,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:27","co2_ppm":826.5,"pm25_ugm3":12.68,"temperature_c":20.5,"humidity_pct":49.0,"student_count_estimated":22,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:30","co2_ppm":847.8,"pm25_ugm3":12.59,"temperature_c":20.5,"humidity_pct":49.1,"student_count_estimated":23,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:34","co2_ppm":841.0,"pm25_ugm3":11.7,"temperature_c":20.5,"humidity_pct":49.2,"student_count_estimated":24,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:37","co2_ppm":854.1,"pm25_ugm3":11.52,"temperature_c":20.5,"humidity_pct":49.3,"student_count_estimated":23,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:41","co2_ppm":856.8,"pm25_ugm3":12.11,"temperature_c":20.5,"humidity_pct":49.4,"student_count_estimated":26,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:44","co2_ppm":869.8,"pm25_ugm3":12.12,"temperature_c":20.5,"humidity_pct":49.5,"student_count_estimated":26,"school_period":"3rd Period","air_quality_label":"Moderate"},{"timestamp":"11:47","co2_ppm":875.8,"pm25_ugm3":11.97,"temperature_c":20.5,"humidity_pct":49.4,"student_count_estimated":26,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"11:51","co2_ppm":866.3,"pm25_ugm3":12.15,"temperature_c":20.5,"humidity_pct":49.4,"student_count_estimated":23,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"11:54","co2_ppm":888.4,"pm25_ugm3":12.62,"temperature_c":20.5,"humidity_pct":49.4,"student_count_estimated":25,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"11:58","co2_ppm":886.3,"pm25_ugm3":12.57,"temperature_c":20.5,"humidity_pct":49.6,"student_count_estimated":26,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:01","co2_ppm":872.2,"pm25_ugm3":12.4,"temperature_c":20.5,"humidity_pct":49.6,"student_count_estimated":22,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:04","co2_ppm":856.0,"pm25_ugm3":12.51,"temperature_c":20.5,"humidity_pct":49.6,"student_count_estimated":21,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:08","co2_ppm":868.4,"pm25_ugm3":12.83,"temperature_c":20.5,"humidity_pct":49.5,"student_count_estimated":27,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:11","co2_ppm":870.8,"pm25_ugm3":11.99,"temperature_c":20.5,"humidity_pct":49.4,"student_count_estimated":20,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:15","co2_ppm":864.1,"pm25_ugm3":12.42,"temperature_c":20.5,"humidity_pct":49.4,"student_count_estimated":23,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:18","co2_ppm":870.8,"pm25_ugm3":12.51,"temperature_c":20.5,"humidity_pct":49.3,"student_count_estimated":25,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:21","co2_ppm":872.9,"pm25_ugm3":12.65,"temperature_c":20.5,"humidity_pct":49.3,"student_count_estimated":20,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:25","co2_ppm":853.2,"pm25_ugm3":12.51,"temperature_c":20.5,"humidity_pct":49.2,"student_count_estimated":24,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:28","co2_ppm":857.0,"pm25_ugm3":12.17,"temperature_c":20.5,"humidity_pct":49.2,"student_count_estimated":24,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:32","co2_ppm":851.7,"pm25_ugm3":11.98,"temperature_c":20.5,"humidity_pct":49.1,"student_count_estimated":24,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:35","co2_ppm":860.8,"pm25_ugm3":12.58,"temperature_c":20.5,"humidity_pct":49.2,"student_count_estimated":26,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:38","co2_ppm":851.3,"pm25_ugm3":11.85,"temperature_c":20.5,"humidity_pct":49.4,"student_count_estimated":21,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:42","co2_ppm":850.1,"pm25_ugm3":11.39,"temperature_c":20.5,"humidity_pct":49.5,"student_count_estimated":27,"school_period":"4th Period","air_quality_label":"Moderate"},{"timestamp":"12:45","co2_ppm":808.0,"pm25_ugm3":11.4,"temperature_c":20.5,"humidity_pct":49.1,"student_count_estimated":6,"school_period":"Lunch Break","air_quality_label":"Moderate"},{"timestamp":"12:49","co2_ppm":701.9,"pm25_ugm3":10.6,"temperature_c":20.5,"humidity_pct":48.3,"student_count_estimated":3,"school_period":"Lunch Break","air_quality_label":"Moderate"},{"timestamp":"12:52","co2_ppm":644.2,"pm25_ugm3":10.23,"temperature_c":20.5,"humidity_pct":47.8,"student_count_estimated":6,"school_period":"Lunch Break","air_quality_label":"Good"},{"timestamp":"12:55","co2_ppm":604.9,"pm25_ugm3":9.72,"temperature_c":20.5,"humidity_pct":47.1,"student_count_estimated":3,"school_period":"Lunch Break","air_quality_label":"Good"},{"timestamp":"12:59","co2_ppm":570.1,"pm25_ugm3":9.5,"temperature_c":20.5,"humidity_pct":46.6,"student_count_estimated":1,"school_period":"Lunch Break","air_quality_label":"Good"},{"timestamp":"13:02","co2_ppm":629.1,"pm25_ugm3":9.71,"temperature_c":20.5,"humidity_pct":46.8,"student_count_estimated":23,"school_period":"5th Period","air_quality_label":"Good"},{"timestamp":"13:06","co2_ppm":687.1,"pm25_ugm3":10.53,"temperature_c":20.5,"humidity_pct":46.8,"student_count_estimated":19,"school_period":"5th Period","air_quality_label":"Good"},{"timestamp":"13:09","co2_ppm":705.9,"pm25_ugm3":10.6,"temperature_c":20.5,"humidity_pct":46.9,"student_count_estimated":21,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:12","co2_ppm":743.5,"pm25_ugm3":11.4,"temperature_c":20.5,"humidity_pct":47.1,"student_count_estimated":24,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:16","co2_ppm":742.0,"pm25_ugm3":11.95,"temperature_c":20.5,"humidity_pct":47.2,"student_count_estimated":20,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:19","co2_ppm":742.7,"pm25_ugm3":12.04,"temperature_c":20.5,"humidity_pct":47.3,"student_count_estimated":19,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:23","co2_ppm":759.4,"pm25_ugm3":11.84,"temperature_c":20.5,"humidity_pct":47.5,"student_count_estimated":20,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:26","co2_ppm":773.1,"pm25_ugm3":11.77,"temperature_c":20.5,"humidity_pct":47.7,"student_count_estimated":21,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:29","co2_ppm":790.6,"pm25_ugm3":11.3,"temperature_c":20.5,"humidity_pct":47.8,"student_count_estimated":19,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:33","co2_ppm":796.8,"pm25_ugm3":12.02,"temperature_c":20.5,"humidity_pct":47.7,"student_count_estimated":23,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:36","co2_ppm":798.0,"pm25_ugm3":11.64,"temperature_c":20.5,"humidity_pct":47.8,"student_count_estimated":19,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:40","co2_ppm":785.5,"pm25_ugm3":11.83,"temperature_c":20.5,"humidity_pct":47.6,"student_count_estimated":19,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:43","co2_ppm":801.8,"pm25_ugm3":11.92,"temperature_c":20.5,"humidity_pct":47.8,"student_count_estimated":25,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:46","co2_ppm":817.4,"pm25_ugm3":11.54,"temperature_c":20.5,"humidity_pct":47.9,"student_count_estimated":25,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:50","co2_ppm":805.5,"pm25_ugm3":11.07,"temperature_c":20.5,"humidity_pct":48.2,"student_count_estimated":23,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:53","co2_ppm":823.9,"pm25_ugm3":10.57,"temperature_c":20.5,"humidity_pct":48.2,"student_count_estimated":22,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"13:57","co2_ppm":807.8,"pm25_ugm3":10.82,"temperature_c":20.5,"humidity_pct":48.1,"student_count_estimated":20,"school_period":"5th Period","air_quality_label":"Moderate"},{"timestamp":"14:00","co2_ppm":783.6,"pm25_ugm3":10.6,"temperature_c":20.5,"humidity_pct":47.8,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Moderate"},{"timestamp":"14:03","co2_ppm":724.1,"pm25_ugm3":10.1,"temperature_c":20.5,"humidity_pct":47.2,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Moderate"},{"timestamp":"14:07","co2_ppm":653.5,"pm25_ugm3":8.72,"temperature_c":20.5,"humidity_pct":46.7,"student_count_estimated":4,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:10","co2_ppm":604.4,"pm25_ugm3":7.88,"temperature_c":20.5,"humidity_pct":46.3,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:14","co2_ppm":589.2,"pm25_ugm3":8.49,"temperature_c":20.5,"humidity_pct":45.9,"student_count_estimated":4,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:17","co2_ppm":569.6,"pm25_ugm3":7.92,"temperature_c":20.5,"humidity_pct":45.7,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:20","co2_ppm":558.0,"pm25_ugm3":7.73,"temperature_c":20.5,"humidity_pct":45.3,"student_count_estimated":4,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:24","co2_ppm":529.2,"pm25_ugm3":7.49,"temperature_c":20.5,"humidity_pct":44.8,"student_count_estimated":3,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:27","co2_ppm":529.2,"pm25_ugm3":6.83,"temperature_c":20.5,"humidity_pct":44.6,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:31","co2_ppm":509.9,"pm25_ugm3":7.4,"temperature_c":20.5,"humidity_pct":44.3,"student_count_estimated":2,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:34","co2_ppm":480.0,"pm25_ugm3":6.93,"temperature_c":20.5,"humidity_pct":44.1,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:37","co2_ppm":464.5,"pm25_ugm3":6.39,"temperature_c":20.5,"humidity_pct":43.8,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:41","co2_ppm":432.2,"pm25_ugm3":6.08,"temperature_c":20.5,"humidity_pct":43.5,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:44","co2_ppm":460.1,"pm25_ugm3":5.38,"temperature_c":20.5,"humidity_pct":43.3,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:48","co2_ppm":449.6,"pm25_ugm3":4.8,"temperature_c":20.5,"humidity_pct":43.0,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:51","co2_ppm":476.6,"pm25_ugm3":5.41,"temperature_c":20.5,"humidity_pct":42.9,"student_count_estimated":4,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:54","co2_ppm":489.8,"pm25_ugm3":6.56,"temperature_c":20.5,"humidity_pct":42.9,"student_count_estimated":7,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"14:58","co2_ppm":510.2,"pm25_ugm3":6.57,"temperature_c":20.5,"humidity_pct":42.9,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:01","co2_ppm":482.4,"pm25_ugm3":6.39,"temperature_c":20.5,"humidity_pct":42.8,"student_count_estimated":2,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:05","co2_ppm":509.7,"pm25_ugm3":7.14,"temperature_c":20.5,"humidity_pct":42.8,"student_count_estimated":7,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:08","co2_ppm":492.4,"pm25_ugm3":6.84,"temperature_c":20.5,"humidity_pct":42.5,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:11","co2_ppm":469.9,"pm25_ugm3":6.17,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:15","co2_ppm":484.5,"pm25_ugm3":6.01,"temperature_c":20.5,"humidity_pct":42.1,"student_count_estimated":4,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:18","co2_ppm":511.7,"pm25_ugm3":5.54,"temperature_c":20.5,"humidity_pct":42.1,"student_count_estimated":7,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:22","co2_ppm":508.5,"pm25_ugm3":5.64,"temperature_c":20.5,"humidity_pct":42.2,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:25","co2_ppm":532.9,"pm25_ugm3":6.26,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:28","co2_ppm":524.5,"pm25_ugm3":6.37,"temperature_c":20.5,"humidity_pct":42.2,"student_count_estimated":1,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:32","co2_ppm":532.0,"pm25_ugm3":6.17,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:35","co2_ppm":536.9,"pm25_ugm3":6.77,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:39","co2_ppm":535.8,"pm25_ugm3":7.29,"temperature_c":20.5,"humidity_pct":42.2,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:42","co2_ppm":519.7,"pm25_ugm3":7.29,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:45","co2_ppm":516.1,"pm25_ugm3":6.77,"temperature_c":20.5,"humidity_pct":42.4,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:49","co2_ppm":536.9,"pm25_ugm3":6.24,"temperature_c":20.5,"humidity_pct":42.6,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:52","co2_ppm":516.5,"pm25_ugm3":5.83,"temperature_c":20.5,"humidity_pct":42.4,"student_count_estimated":2,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:56","co2_ppm":556.9,"pm25_ugm3":6.74,"temperature_c":20.5,"humidity_pct":42.4,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"15:59","co2_ppm":571.9,"pm25_ugm3":6.12,"temperature_c":20.5,"humidity_pct":42.4,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:02","co2_ppm":539.3,"pm25_ugm3":6.78,"temperature_c":20.5,"humidity_pct":42.2,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:06","co2_ppm":520.4,"pm25_ugm3":6.55,"temperature_c":20.5,"humidity_pct":42.2,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:09","co2_ppm":482.0,"pm25_ugm3":6.4,"temperature_c":20.5,"humidity_pct":42.1,"student_count_estimated":2,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:13","co2_ppm":504.1,"pm25_ugm3":6.45,"temperature_c":20.5,"humidity_pct":42.2,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:16","co2_ppm":499.8,"pm25_ugm3":6.74,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":2,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:19","co2_ppm":496.3,"pm25_ugm3":6.57,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":7,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:23","co2_ppm":504.4,"pm25_ugm3":6.6,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":3,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:26","co2_ppm":513.1,"pm25_ugm3":6.26,"temperature_c":20.5,"humidity_pct":42.2,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:30","co2_ppm":530.1,"pm25_ugm3":6.26,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:33","co2_ppm":531.4,"pm25_ugm3":6.91,"temperature_c":20.5,"humidity_pct":42.4,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:36","co2_ppm":517.7,"pm25_ugm3":6.36,"temperature_c":20.5,"humidity_pct":42.3,"student_count_estimated":2,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:40","co2_ppm":507.4,"pm25_ugm3":5.72,"temperature_c":20.5,"humidity_pct":42.1,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:43","co2_ppm":509.1,"pm25_ugm3":4.95,"temperature_c":20.5,"humidity_pct":42.1,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:47","co2_ppm":486.1,"pm25_ugm3":4.49,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:50","co2_ppm":488.3,"pm25_ugm3":5.38,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":4,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:53","co2_ppm":500.8,"pm25_ugm3":5.73,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":2,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"16:57","co2_ppm":477.1,"pm25_ugm3":5.8,"temperature_c":20.4,"humidity_pct":41.8,"student_count_estimated":3,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:00","co2_ppm":472.1,"pm25_ugm3":6.43,"temperature_c":20.4,"humidity_pct":41.7,"student_count_estimated":3,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:04","co2_ppm":488.1,"pm25_ugm3":6.82,"temperature_c":20.4,"humidity_pct":41.6,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:07","co2_ppm":500.9,"pm25_ugm3":6.41,"temperature_c":20.4,"humidity_pct":41.6,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:10","co2_ppm":516.2,"pm25_ugm3":6.48,"temperature_c":20.4,"humidity_pct":41.7,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:14","co2_ppm":518.9,"pm25_ugm3":5.76,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:17","co2_ppm":515.1,"pm25_ugm3":6.42,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:21","co2_ppm":499.5,"pm25_ugm3":5.78,"temperature_c":20.4,"humidity_pct":41.8,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:24","co2_ppm":496.5,"pm25_ugm3":5.43,"temperature_c":20.4,"humidity_pct":41.7,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:27","co2_ppm":530.9,"pm25_ugm3":4.86,"temperature_c":20.4,"humidity_pct":41.8,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:31","co2_ppm":524.0,"pm25_ugm3":5.43,"temperature_c":20.4,"humidity_pct":41.8,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:34","co2_ppm":531.1,"pm25_ugm3":5.81,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:38","co2_ppm":514.8,"pm25_ugm3":6.26,"temperature_c":20.4,"humidity_pct":41.7,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:41","co2_ppm":482.8,"pm25_ugm3":5.68,"temperature_c":20.4,"humidity_pct":41.5,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:44","co2_ppm":474.0,"pm25_ugm3":5.29,"temperature_c":20.4,"humidity_pct":41.5,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:48","co2_ppm":508.2,"pm25_ugm3":5.02,"temperature_c":20.4,"humidity_pct":41.7,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:51","co2_ppm":507.2,"pm25_ugm3":4.9,"temperature_c":20.4,"humidity_pct":41.8,"student_count_estimated":7,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:55","co2_ppm":528.2,"pm25_ugm3":5.65,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"17:58","co2_ppm":523.0,"pm25_ugm3":5.63,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:01","co2_ppm":509.6,"pm25_ugm3":5.8,"temperature_c":20.4,"humidity_pct":41.8,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:05","co2_ppm":499.7,"pm25_ugm3":5.74,"temperature_c":20.4,"humidity_pct":41.7,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:08","co2_ppm":495.9,"pm25_ugm3":6.07,"temperature_c":20.4,"humidity_pct":41.7,"student_count_estimated":3,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:12","co2_ppm":507.0,"pm25_ugm3":7.0,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":6,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:15","co2_ppm":516.9,"pm25_ugm3":6.92,"temperature_c":20.4,"humidity_pct":42.1,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:18","co2_ppm":505.9,"pm25_ugm3":6.59,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":3,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:22","co2_ppm":494.2,"pm25_ugm3":6.52,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:25","co2_ppm":487.5,"pm25_ugm3":6.02,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":4,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:29","co2_ppm":481.8,"pm25_ugm3":6.13,"temperature_c":20.4,"humidity_pct":41.8,"student_count_estimated":7,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:32","co2_ppm":477.3,"pm25_ugm3":5.67,"temperature_c":20.4,"humidity_pct":41.8,"student_count_estimated":8,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:35","co2_ppm":446.0,"pm25_ugm3":6.19,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:39","co2_ppm":457.0,"pm25_ugm3":5.96,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:42","co2_ppm":472.1,"pm25_ugm3":6.43,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:46","co2_ppm":451.1,"pm25_ugm3":6.19,"temperature_c":20.4,"humidity_pct":42.1,"student_count_estimated":4,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:49","co2_ppm":477.2,"pm25_ugm3":6.92,"temperature_c":20.4,"humidity_pct":42.2,"student_count_estimated":9,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:52","co2_ppm":454.6,"pm25_ugm3":6.48,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":0,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:56","co2_ppm":467.8,"pm25_ugm3":6.21,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":3,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"18:59","co2_ppm":489.7,"pm25_ugm3":6.65,"temperature_c":20.4,"humidity_pct":42.1,"student_count_estimated":3,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"19:03","co2_ppm":464.3,"pm25_ugm3":6.93,"temperature_c":20.4,"humidity_pct":42.0,"student_count_estimated":1,"school_period":"End of Day","air_quality_label":"Good"},{"timestamp":"19:06","co2_ppm":473.2,"pm25_ugm3":7.09,"temperature_c":20.4,"humidity_pct":41.9,"student_count_estimated":5,"school_period":"End of Day","air_quality_label":"Good"}];
+
+const PERIOD_ORDER = ['Morning Entry','1st Period','2nd Period','Break','3rd Period','4th Period','Lunch Break','5th Period','End of Day'];
+const PERIOD_STATS = {"Morning Entry":{"avg_co2":575.4,"avg_pm25":7.79,"avg_students":10.6,"avg_humidity":44.7,"count":27},"1st Period":{"avg_co2":830.9,"avg_pm25":11.23,"avg_students":24.4,"avg_humidity":47.3,"count":35},"2nd Period":{"avg_co2":864.7,"avg_pm25":12.72,"avg_students":25.0,"avg_humidity":49.1,"count":27},"Break":{"avg_co2":648.8,"avg_pm25":10.86,"avg_students":1.9,"avg_humidity":47.7,"count":9},"3rd Period":{"avg_co2":791.5,"avg_pm25":11.93,"avg_students":24.5,"avg_humidity":48.4,"count":35},"4th Period":{"avg_co2":866.2,"avg_pm25":12.26,"avg_students":23.6,"avg_humidity":49.4,"count":35},"Lunch Break":{"avg_co2":663.7,"avg_pm25":10.34,"avg_students":3.7,"avg_humidity":47.8,"count":9},"5th Period":{"avg_co2":765.3,"avg_pm25":11.32,"avg_students":21.5,"avg_humidity":47.6,"count":35},"End of Day":{"avg_co2":503.6,"avg_pm25":6.39,"avg_students":4.5,"avg_humidity":42.2,"count":288}};
+
+// ── STATE ──
+let selectedPeriods = new Set(PERIOD_ORDER);
+let selectedAQ = new Set(['Good','Moderate']);
+
+// ── INIT FILTERS ──
+function initFilters() {
+  const container = document.getElementById('periodFilters');
+  PERIOD_ORDER.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'filter-item active';
+    div.id = 'pf_' + p.replace(/\s/g,'_');
+    div.onclick = () => togglePeriod(p);
+    const stats = PERIOD_STATS[p];
+    const pct = Math.round(stats.avg_co2 / 893 * 100);
+    div.innerHTML = `
+      <div class="filter-check"></div>
+      <div style="flex:1">
+        <span>${p}</span>
+        <div class="filter-bar"><div class="filter-bar-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function togglePeriod(p) {
+  if (selectedPeriods.has(p)) {
+    if (selectedPeriods.size > 1) selectedPeriods.delete(p);
+  } else selectedPeriods.add(p);
+  document.getElementById('pf_' + p.replace(/\s/g,'_')).classList.toggle('active', selectedPeriods.has(p));
+  const allSelected = selectedPeriods.size === PERIOD_ORDER.length;
+  document.getElementById('selectAllBtn').textContent = allSelected ? 'Deselect All' : 'Select All';
+  updateAll();
+}
+
+function toggleAll() {
+  const all = selectedPeriods.size === PERIOD_ORDER.length;
+  if (all) {
+    selectedPeriods = new Set([PERIOD_ORDER[0]]);
+  } else {
+    selectedPeriods = new Set(PERIOD_ORDER);
+  }
+  PERIOD_ORDER.forEach(p => {
+    document.getElementById('pf_' + p.replace(/\s/g,'_')).classList.toggle('active', selectedPeriods.has(p));
+  });
+  document.getElementById('selectAllBtn').textContent = selectedPeriods.size === PERIOD_ORDER.length ? 'Deselect All' : 'Select All';
+  updateAll();
+}
+
+function toggleAQ(label) {
+  if (selectedAQ.has(label)) {
+    if (selectedAQ.size > 1) selectedAQ.delete(label);
+  } else selectedAQ.add(label);
+  document.getElementById('aq' + label).classList.toggle('active', selectedAQ.has(label));
+  updateAll();
+}
+
+// ── FILTERED DATA ──
+function getFiltered() {
+  return RAW.filter(d => selectedPeriods.has(d.school_period) && selectedAQ.has(d.air_quality_label));
+}
+
+function avg(arr, key) { return arr.length ? arr.reduce((s,d) => s + d[key], 0) / arr.length : 0; }
+function count(arr, key, val) { return arr.filter(d => d[key] === val).length; }
+
+// ── CHARTS ──
+let co2Chart, pm25Chart, periodChart, donutChart, scatterChart;
+
+function buildCO2Chart(data) {
+  const ctx = document.getElementById('co2Chart').getContext('2d');
+  const labels = data.map(d => d.timestamp);
+  const vals = data.map(d => d.co2_ppm);
+  const colors = data.map(d => d.air_quality_label === 'Good' ? 'rgba(79,195,247,0.9)' : 'rgba(255,179,0,0.9)');
+  if (co2Chart) co2Chart.destroy();
+  co2Chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        borderColor: 'rgba(79,195,247,0.8)',
+        backgroundColor: (ctx2) => {
+          const g = ctx2.chart.ctx.createLinearGradient(0,0,0,180);
+          g.addColorStop(0,'rgba(79,195,247,0.25)');
+          g.addColorStop(1,'rgba(79,195,247,0)');
+          return g;
+        },
+        borderWidth: 1.5,
+        fill: true,
+        pointRadius: 0,
+        tension: 0.3,
+        pointHoverRadius: 4
+      },{
+        data: Array(vals.length).fill(700),
+        borderColor: 'rgba(255,82,82,0.4)',
+        borderWidth: 1,
+        borderDash: [5,4],
+        fill: false,
+        pointRadius: 0,
+        tension: 0,
+        label: 'Threshold'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#0f3460', borderColor: 'rgba(79,195,247,0.3)', borderWidth: 1,
+        callbacks: { label: ctx2 => `CO₂: ${ctx2.raw} ppm` }
+      }},
+      scales: {
+        x: { ticks: { color:'#546e7a', maxTicksLimit: 10, font:{size:10} }, grid: { color:'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color:'#546e7a', font:{size:10} }, grid: { color:'rgba(255,255,255,0.06)' }, min: 400 }
+      }
+    }
+  });
+}
+
+function buildPM25Chart(data) {
+  const ctx = document.getElementById('pm25Chart').getContext('2d');
+  if (pm25Chart) pm25Chart.destroy();
+  pm25Chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.timestamp),
+      datasets: [{
+        data: data.map(d => d.pm25_ugm3),
+        borderColor: 'rgba(0,229,255,0.8)',
+        backgroundColor: (ctx2) => {
+          const g = ctx2.chart.ctx.createLinearGradient(0,0,0,180);
+          g.addColorStop(0,'rgba(0,229,255,0.2)');
+          g.addColorStop(1,'rgba(0,229,255,0)');
+          return g;
+        },
+        borderWidth: 1.5, fill: true, pointRadius: 0, tension: 0.35
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#0f3460', borderColor: 'rgba(0,229,255,0.3)', borderWidth: 1,
+        callbacks: { label: ctx2 => `PM2.5: ${ctx2.raw} µg/m³` }
+      }},
+      scales: {
+        x: { ticks: { color:'#546e7a', maxTicksLimit: 10, font:{size:10} }, grid: { color:'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color:'#546e7a', font:{size:10} }, grid: { color:'rgba(255,255,255,0.06)' } }
+      }
+    }
+  });
+}
+
+function buildPeriodChart() {
+  const ctx = document.getElementById('periodChart').getContext('2d');
+  const periods = PERIOD_ORDER.filter(p => selectedPeriods.has(p));
+  const co2s = periods.map(p => +PERIOD_STATS[p].avg_co2.toFixed(1));
+  const pm25s = periods.map(p => +PERIOD_STATS[p].avg_pm25.toFixed(2));
+  if (periodChart) periodChart.destroy();
+  periodChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: periods,
+      datasets: [
+        { label: 'CO₂ (ppm)', data: co2s, backgroundColor: 'rgba(79,195,247,0.7)', borderColor: 'rgba(79,195,247,1)', borderWidth: 1, yAxisID: 'y' },
+        { label: 'PM2.5 (µg/m³)', data: pm25s, backgroundColor: 'rgba(0,229,255,0.5)', borderColor: 'rgba(0,229,255,1)', borderWidth: 1, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: { legend: { labels: { color:'#90a4ae', font:{size:10}, boxWidth:10 } }, tooltip: { backgroundColor:'#0f3460', borderColor:'rgba(79,195,247,0.3)', borderWidth:1 } },
+      scales: {
+        x: { ticks: { color:'#546e7a', font:{size:9}, maxRotation:30 }, grid: { display:false } },
+        y: { ticks: { color:'#4fc3f7', font:{size:9} }, grid: { color:'rgba(255,255,255,0.05)' }, title: { display:true, text:'CO₂ (ppm)', color:'#4fc3f7', font:{size:9} } },
+        y2: { position:'right', ticks: { color:'#00e5ff', font:{size:9} }, grid: { display:false }, title: { display:true, text:'PM2.5', color:'#00e5ff', font:{size:9} } }
+      }
+    }
+  });
+}
+
+function buildDonut(data) {
+  const ctx = document.getElementById('donutChart').getContext('2d');
+  const good = count(data,'air_quality_label','Good');
+  const mod = data.length - good;
+  if (donutChart) donutChart.destroy();
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Good','Moderate'],
+      datasets: [{ data:[good,mod], backgroundColor:['rgba(0,230,118,0.8)','rgba(255,179,0,0.75)'], borderColor:['#00e676','#ffb300'], borderWidth:2, hoverOffset:6 }]
+    },
+    options: {
+      cutout:'68%',
+      responsive: true, maintainAspectRatio: true,
+      animation: { duration: 600 },
+      plugins: {
+        legend: { position:'bottom', labels:{ color:'#90a4ae', font:{size:10}, boxWidth:10, padding:8 } },
+        tooltip: { backgroundColor:'#0f3460', borderColor:'rgba(0,230,118,0.3)', borderWidth:1 }
+      }
+    }
+  });
+}
+
+function buildScatter(data) {
+  const ctx = document.getElementById('scatterChart').getContext('2d');
+  const pts = data.map(d => ({x:d.student_count_estimated, y:d.co2_ppm, label:d.air_quality_label}));
+  if (scatterChart) scatterChart.destroy();
+  scatterChart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { label:'Good', data: pts.filter(p=>p.label==='Good').map(p=>({x:p.x,y:p.y})), backgroundColor:'rgba(0,230,118,0.5)', pointRadius:3 },
+        { label:'Moderate', data: pts.filter(p=>p.label==='Moderate').map(p=>({x:p.x,y:p.y})), backgroundColor:'rgba(255,179,0,0.55)', pointRadius:3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: { legend: { labels:{ color:'#90a4ae', font:{size:10}, boxWidth:8 } }, tooltip: { backgroundColor:'#0f3460', borderColor:'rgba(79,195,247,0.2)', borderWidth:1, callbacks:{ label: ctx2 => `Students: ${ctx2.raw.x} · CO₂: ${ctx2.raw.y}` } } },
+      scales: {
+        x: { ticks:{ color:'#546e7a', font:{size:9} }, grid:{ color:'rgba(255,255,255,0.05)' }, title:{ display:true, text:'Students', color:'#546e7a', font:{size:9} } },
+        y: { ticks:{ color:'#546e7a', font:{size:9} }, grid:{ color:'rgba(255,255,255,0.05)' }, title:{ display:true, text:'CO₂ (ppm)', color:'#546e7a', font:{size:9} }, min:400 }
+      }
+    }
+  });
+}
+
+function buildTable() {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  const periods = PERIOD_ORDER.filter(p => selectedPeriods.has(p));
+  const maxCO2 = Math.max(...periods.map(p=>PERIOD_STATS[p].avg_co2));
+  periods.forEach(p => {
+    const s = PERIOD_STATS[p];
+    const barW = Math.round(s.avg_co2 / maxCO2 * 80);
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${p}</td>
+      <td>${s.avg_co2.toFixed(1)} <span class="mini-bar" style="width:${barW}px;background:rgba(79,195,247,0.5)"></span></td>
+      <td>${s.avg_pm25.toFixed(2)}</td>
+      <td>${s.avg_students.toFixed(1)}</td>
+      <td>${s.avg_humidity.toFixed(1)}</td>
+      <td>${s.count}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+// ── UPDATE ALL ──
+function updateAll() {
+  const data = getFiltered();
+  const n = data.length;
+  const avgCO2 = avg(data,'co2_ppm');
+  const avgPM25 = avg(data,'pm25_ugm3');
+  const avgTemp = avg(data,'temperature_c');
+  const avgHum = avg(data,'humidity_pct');
+  const goodN = count(data,'air_quality_label','Good');
+  const goodPct = n ? Math.round(goodN/n*100) : 0;
+
+  // KPIs
+  document.getElementById('kpiCO2').textContent = Math.round(avgCO2);
+  document.getElementById('kpiPM25').textContent = avgPM25.toFixed(1);
+  document.getElementById('kpiTemp').textContent = avgTemp.toFixed(1);
+  document.getElementById('kpiHum').textContent = avgHum.toFixed(1);
+  document.getElementById('kpiGoodPct').textContent = goodPct + '%';
+  document.getElementById('kpiGoodCount').textContent = `${goodN} of ${n} readings`;
+  document.getElementById('kpiCO2Trend').textContent = avgCO2 > 700 ? '↑ elevated' : '✓ normal';
+  document.getElementById('kpiCO2Trend').className = 'kpi-trend ' + (avgCO2 > 700 ? 'up' : 'ok');
+  document.getElementById('kpiQualTrend').textContent = goodPct >= 50 ? '✓ majority good' : '⚠ mostly moderate';
+  document.getElementById('kpiQualTrend').className = 'kpi-trend ' + (goodPct >= 50 ? 'ok' : 'up');
+  document.getElementById('co2Badge').textContent = `Avg ${Math.round(avgCO2)} ppm`;
+  document.getElementById('pm25Badge').textContent = `Avg ${avgPM25.toFixed(1)} µg/m³`;
+  document.getElementById('donutBadge').textContent = `${n} readings`;
+  const maxCO2 = n ? Math.max(...data.map(d=>d.co2_ppm)) : 0;
+  document.getElementById('statMax').textContent = maxCO2.toFixed(0) + ' ppm';
+  document.getElementById('statTotal').textContent = n;
+  document.getElementById('statGood').textContent = goodN;
+  document.getElementById('statMod').textContent = n - goodN;
+
+  // filter badge
+  const selP = [...selectedPeriods];
+  const badge = selP.length === PERIOD_ORDER.length ? 'All periods selected' : selP.join(', ');
+  document.getElementById('filterBadge').textContent = badge;
+
+  buildCO2Chart(data);
+  buildPM25Chart(data);
+  buildPeriodChart();
+  buildDonut(data);
+  buildScatter(data);
+  buildTable();
+}
+
+// ── BOOT ──
+initFilters();
+updateAll();
+</script>
+</body>
+</html>
